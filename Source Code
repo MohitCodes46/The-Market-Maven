@@ -1,0 +1,87 @@
+import java.math.BigDecimal;
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
+public class StockMarket{
+    private static final ConcurrentHashMap<String, StockData> stocks = new ConcurrentHashMap<>();
+    private static final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+    public static void main(String[] args){
+        stocks.put("AAPL", new StockData("AAPL", Currency.USD, BigDecimal.valueOf(170.00)));
+        stocks.put("GOOG", new StockData("GOOG", Currency.USD, BigDecimal.valueOf(110.00)));
+        stocks.put("EUR/USD", new StockData("EUR/USD", Currency.USD, BigDecimal.valueOf(1.10)));
+
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            System.out.println("Shutting down scheduler...");
+            scheduler.shutdown();
+        }));
+
+        scheduler.scheduleAtFixedRate(StockMarket::updateAndPredict, 0, 1, TimeUnit.SECONDS);
+    }
+    private static void updateAndPredict(){
+        System.out.println("\nUpdating and predicting stock prices at: " + LocalDateTime.now());
+        updateStockPrices();
+        predictStockPrices();
+    }
+    private static void updateStockPrices(){
+        for (StockData stock : stocks.values()) {
+            BigDecimal changeFactor = BigDecimal.valueOf(1 + (Math.random() - 0.5) / 100);
+            BigDecimal newPrice = stock.getCurrentPrice().multiply(changeFactor).setScale(2, BigDecimal.ROUND_HALF_UP);
+            stock.setPredictedPrice(newPrice, LocalDateTime.now().plus(Duration.ofSeconds(10)));
+
+            System.out.println("Updated price for " + stock.getSymbol() + ": " + newPrice + " (" + stock.getCurrency() + ")");
+        }
+    }
+    private static void predictStockPrices(){
+        for (StockData stock : stocks.values()) {
+            if (stock.hasPrediction()) {
+                System.out.println("Predicted Price Change for " + stock.getSymbol() + ": ");
+                System.out.println("Predicted Price: " + stock.getPredictedPrice() + " (" + stock.getCurrency() + ") at " + stock.getPredictedTime());
+            }
+        }
+    }
+    public enum Currency{
+        USD, EUR, GBP, JPY
+    }
+    public static class StockData{
+        private final String symbol;
+        private final Currency currency;
+        private final BigDecimal currentPrice;
+        private BigDecimal predictedPrice;
+        private LocalDateTime predictedTime;
+        public StockData(String symbol, Currency currency, BigDecimal currentPrice) {
+            this.symbol = symbol;
+            this.currency = currency;
+            this.currentPrice = currentPrice;
+        }
+        public String getSymbol() {
+            return symbol;
+        }
+        public Currency getCurrency() {
+            return currency;
+        }
+        public BigDecimal getCurrentPrice() {
+            return currentPrice;
+        }
+        public boolean hasPrediction() {
+            return predictedPrice != null && predictedTime != null;
+        }
+        public BigDecimal getPredictedPrice() {
+            return predictedPrice;
+        }
+        public void setPredictedPrice(BigDecimal predictedPrice, LocalDateTime predictedTime) {
+            this.predictedPrice = predictedPrice;
+            this.predictedTime = predictedTime;
+        }
+        public LocalDateTime getPredictedTime() {
+            return predictedTime;
+        }
+        @Override
+        public String toString() {
+            return symbol + " (" + currency + ") - Current Price: " + currentPrice;
+        }
+    }
+}
